@@ -7,10 +7,16 @@ Doorkeeper.configure do
 
   # This block will be called to check whether the resource owner is authenticated or not.
   resource_owner_authenticator do
-    raise "Please configure doorkeeper resource_owner_authenticator block located in #{__FILE__}"
+    # ブロック内はアプリケーションのコンテキストで実行されるため、モデル、セッション、ルートヘルパーにアクセス可
+    # ただし、ApplicationControllerのコンテキストでは実行されないため、そこに定義されたメソッドは利用できない
+
+    # raise "Please configure doorkeeper resource_owner_authenticator block located in #{__FILE__}"
     # Put your resource owner authentication logic here.
     # Example implementation:
     #   User.find_by(id: session[:user_id]) || redirect_to(new_user_session_url)
+
+    # deviseによる認証
+    current_user || warden.authenticate!(scope: :user)
   end
 
   # If you didn't skip applications controller from Doorkeeper routes in your application routes.rb
@@ -18,16 +24,21 @@ Doorkeeper.configure do
   # adding oauth authorized applications. In other case it will return 403 Forbidden response
   # every time somebody will try to access the admin web interface.
   #
-  # admin_authenticator do
-  #   # Put your admin authentication logic here.
-  #   # Example implementation:
-  #
-  #   if current_user
-  #     head :forbidden unless current_user.admin?
-  #   else
-  #     redirect_to sign_in_url
-  #   end
-  # end
+  admin_authenticator do
+    # /oauth/applications を利用可能にするため、アクセスする際の認証ロジックを定義する
+
+    # Put your admin authentication logic here.
+    # Example implementation:
+
+    # if current_user
+    #   head :forbidden unless current_user.admin?
+    # else
+    #   redirect_to sign_in_url
+    # end
+
+    # deviseによる認証
+    current_user || warden.authenticate!(scope: :user)
+  end
 
   # You can use your own model classes if you need to extend (or even override) default
   # Doorkeeper models such as `Application`, `AccessToken` and `AccessGrant.
@@ -244,7 +255,7 @@ Doorkeeper.configure do
   # For more information go to
   # https://doorkeeper.gitbook.io/guides/ruby-on-rails/scopes
   #
-  # default_scopes  :public
+  default_scopes  :openid
   # optional_scopes :write, :update
 
   # Allows to restrict only certain scopes for grant_type.
@@ -464,7 +475,8 @@ Doorkeeper.configure do
   # Under some circumstances you might want to have applications auto-approved,
   # so that the user skips the authorization step.
   # For example if dealing with a trusted application.
-  #
+
+  # true を返すようにすると「同意画面を表示せず、自動で同意したことにする」ことも可能
   # skip_authorization do |resource_owner, client|
   #   client.superapp? or resource_owner.admin?
   # end
